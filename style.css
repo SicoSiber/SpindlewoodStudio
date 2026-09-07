@@ -71,6 +71,14 @@ h2 {
 .about-image {
     flex: 1;
     min-width: 300px;
+    text-align: center;
+}
+
+.about-character-img {
+    max-width: 250px;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 10px 15px rgba(250, 204, 21, 0.2)); /* Yellow glow */
 }
 
 .featured-img {
