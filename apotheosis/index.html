@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apotheosis | Character & Inventory Codex</title>
+    <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+    <div class="bg-glow"></div>
+
+    <header>
+        <div class="header-container">
+            <div class="brand-section">
+                <div class="brand-logo-badge">Ω</div>
+                <div class="brand-titles">
+                    <h1>Apotheosis</h1>
+                    <p>Campaign Character, Inventory & Reputation Tracker</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="sync-status">
+                    <span class="status-dot"></span>
+                    <span id="sync-text">Live Sync Ready</span>
+                </div>
+                <button class="btn-secondary" id="btn-refresh" title="Reload live data from Google Sheet">
+                    <span>🔄</span> Refresh
+                </button>
+                <a href="https://docs.google.com/spreadsheets/d/1f0XrgZxrFFFCIl2s8ZVTMASMDLpILMUgSwQ_2B4zRzQ/edit?gid=0#gid=0" target="_blank" rel="noopener" class="btn-secondary" title="Open Google Sheet in new tab">
+                    <span>📊</span> Google Sheet
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Character Selector Bar -->
+        <div class="control-bar">
+            <div class="selector-group">
+                <label for="character-select" class="selector-label">Select Character:</label>
+                <div class="character-select-wrapper">
+                    <select id="character-select" class="character-select">
+                        <option value="" disabled selected>Loading roster...</option>
+                    </select>
+                    <span class="select-chevron">▼</span>
+                </div>
+            </div>
+            <div class="character-pills" id="character-pills">
+                <!-- Quick jump buttons dynamically rendered here -->
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Consulting the archives...</p>
+        </div>
+
+        <!-- Character Content Area -->
+        <div id="character-content">
+            <!-- Hero Card -->
+            <div class="character-hero-card">
+                <div class="hero-main">
+                    <h2 class="hero-title" id="char-name">---</h2>
+                    <div class="hero-meta">
+                        <span class="meta-badge">🌿 Class: <strong id="char-class">---</strong></span>
+                        <span class="meta-badge">👤 Player: <strong id="char-player">---</strong></span>
+                    </div>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-box">
+                        <div class="stat-value" id="char-level">-</div>
+                        <div class="stat-label">Current Level</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="char-adventures">-</div>
+                        <div class="stat-label">Adventures This Level</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two-Column Grid: Left: Reputations, Right: Materials & Items -->
+            <div class="content-grid">
+                
+                <!-- Left Column: Faction Reputations -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2>🏛️ Faction Reputation</h2>
+                        <span class="badge-counter" id="rep-active-count">0 Active</span>
+                    </div>
+                    <div class="reputation-list" id="reputation-list">
+                        <!-- Reputations rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Right Column: Materials & Items -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2>🎒 Harvested Materials</h2>
+                        <span class="badge-counter" id="mat-count">0 Materials</span>
+                    </div>
+                    <div class="materials-grid" id="materials-grid">
+                        <!-- Materials rendered dynamically -->
+                    </div>
+
+                    <div class="section-header" style="margin-top: 1rem;">
+                        <h2>✨ Magic Items</h2>
+                        <span class="badge-counter" id="magic-count">0 Items</span>
+                    </div>
+                    <div class="items-list" id="magic-items-list" style="margin-bottom: 1.5rem;">
+                        <!-- Magic items rendered dynamically -->
+                    </div>
+
+                    <div class="section-header">
+                        <h2>📦 Miscellaneous & Notes</h2>
+                        <span class="badge-counter" id="misc-count">0 Items</span>
+                    </div>
+                    <div class="items-list" id="misc-items-list">
+                        <!-- Misc items rendered dynamically -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>Apotheosis Campaign Codex &bull; Powered by Google Sheets Live Sync &bull; <a href="../">Spindlewood Studio / Sicosiber</a></p>
+    </footer>
+
+    <script>
+        const SPREADSHEET_ID = '1f0XrgZxrFFFCIl2s8ZVTMASMDLpILMUgSwQ_2B4zRzQ';
+        
+        // Default roster fallback
+        const DEFAULT_ROSTER = [
+            'Harrow',
+            'Schnagnus Schnarlson',
+            "Addy's Ranger",
+            'Chad',
+            'Lulu',
+            'Fig B',
+            'Floyd Chowder',
+            'Biotch'
+        ];
+
+        let availableSheets = [...DEFAULT_ROSTER];
+        let currentCharacter = 'Harrow';
+        let jsonpScriptElement = null;
+
+        const rarityMap = {
+            'u': { name: 'Uncommon', class: 'rarity-uncommon' },
+            'r': { name: 'Rare', class: 'rarity-rare' },
+            'v': { name: 'Very Rare', class: 'rarity-very-rare' },
+            'l': { name: 'Legendary', class: 'rarity-legendary' }
+        };
+
+        // Initialize application
+        async function init() {
+            renderSelectorOptions();
+            setupEventListeners();
+            
+            // Check URL Hash for deep linking
+            const hash = decodeURIComponent(window.location.hash.replace('#', '')).trim();
+            if (hash && (availableSheets.includes(hash) || hash.length > 0)) {
+                currentCharacter = hash;
+            }
+
+            // Fetch live sheet names in background
+            fetchDynamicRoster();
+
+            // Load initial character data
+            loadCharacter(currentCharacter);
+        }
+
+        // Dynamically fetch sheet tabs from Google Sheets via lightweight proxy
+        async function fetchDynamicRoster() {
+            try {
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/htmlview`)}`;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+                const response = await fetch(proxyUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const html = await response.text();
+                    const matches = [...html.matchAll(/items\.push\(\{name:\s*"([^"]+)"/g)];
+                    if (matches.length > 0) {
+                        const parsedSheets = matches
+                            .map(m => m[1].replace(/\\x27/g, "'"))
+                            .filter(name => name.toLowerCase() !== 'template');
+
+                        if (parsedSheets.length > 0) {
+                            availableSheets = parsedSheets;
+                            renderSelectorOptions();
+                        }
+                    }
+                }
+            } catch (err) {
+                // If dynamic discovery fails, we cleanly continue with default roster
+                console.log('Using default roster list.');
+            }
+        }
+
+        function renderSelectorOptions() {
+            const selectEl = document.getElementById('character-select');
+            const pillsEl = document.getElementById('character-pills');
+            
+            selectEl.innerHTML = '';
+            pillsEl.innerHTML = '';
+
+            availableSheets.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if (name === currentCharacter) opt.selected = true;
+                selectEl.appendChild(opt);
+
+                const pill = document.createElement('button');
+                pill.className = `pill-btn ${name === currentCharacter ? 'active' : ''}`;
+                pill.textContent = name;
+                pill.onclick = () => selectCharacter(name);
+                pillsEl.appendChild(pill);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('character-select').addEventListener('change', (e) => {
+                selectCharacter(e.target.value);
+            });
+
+            document.getElementById('btn-refresh').addEventListener('click', () => {
+                loadCharacter(currentCharacter);
+            });
+
+            window.addEventListener('hashchange', () => {
+                const hash = decodeURIComponent(window.location.hash.replace('#', '')).trim();
+                if (hash && hash !== currentCharacter) {
+                    selectCharacter(hash, false);
+                }
+            });
+        }
+
+        function selectCharacter(name, updateHash = true) {
+            currentCharacter = name;
+            document.getElementById('character-select').value = name;
+            
+            // Update active pill state
+            document.querySelectorAll('.pill-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === name);
+            });
+
+            if (updateHash) {
+                window.location.hash = encodeURIComponent(name);
+            }
+
+            loadCharacter(name);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading-overlay').style.display = show ? 'block' : 'none';
+            document.getElementById('character-content').style.opacity = show ? '0.3' : '1';
+        }
+
+        // Fetch character data directly from Google Visualization API with JSONP (no CORS restriction)
+        function loadCharacter(sheetName) {
+            showLoading(true);
+            document.getElementById('sync-text').textContent = 'Syncing...';
+
+            if (jsonpScriptElement) {
+                jsonpScriptElement.remove();
+            }
+
+            const callbackName = 'handleApotheosisData';
+            window[callbackName] = (jsonData) => {
+                showLoading(false);
+                parseAndRenderData(jsonData);
+                const now = new Date();
+                document.getElementById('sync-text').textContent = `Live (${now.toLocaleTimeString()})`;
+            };
+
+            const script = document.createElement('script');
+            script.src = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?headers=0&sheet=${encodeURIComponent(sheetName)}&tqx=responseHandler:${callbackName}&_=${Date.now()}`;
+            script.onerror = () => {
+                showLoading(false);
+                document.getElementById('sync-text').textContent = 'Sync error';
+                alert(`Could not load data for "${sheetName}". Please check if the sheet name exists.`);
+            };
+
+            jsonpScriptElement = script;
+            document.body.appendChild(script);
+        }
+
+        // Parse and render the Google Sheet Table
+        function parseAndRenderData(data) {
+            if (!data || !data.table || !data.table.rows) {
+                alert('No data returned from Google Sheet.');
+                return;
+            }
+
+            const rows = data.table.rows;
+            const getVal = (r, c) => {
+                if (r < rows.length && rows[r].c && c < rows[r].c.length) {
+                    const cell = rows[r].c[c];
+                    if (cell && cell.v !== null && cell.v !== undefined) {
+                        return String(cell.v).trim();
+                    }
+                }
+                return '';
+            };
+
+            // 1. Column Headers for Materials (Row 0)
+            const headerCols = [];
+            for (let c = 0; c < 14; c++) {
+                headerCols.push(getVal(0, c));
+            }
+
+            // 2. Character Details (Rows 20+)
+            const charDetails = {
+                name: currentCharacter,
+                class: '---',
+                player: '---',
+                level: '1',
+                adventures: '0'
+            };
+
+            // 3. Faction Reputations (Rows 20+)
+            const reputations = [];
+
+            for (let r = 20; r < rows.length; r++) {
+                const factionName = getVal(r, 0);
+                const factionScore = getVal(r, 2);
+                if (factionName && factionName.toUpperCase() !== 'REPUTATION') {
+                    reputations.push({
+                        name: factionName,
+                        score: factionScore || '0'
+                    });
+                }
+
+                // Check character metadata labels in columns
+                for (let c = 3; c < 12; c++) {
+                    const text = getVal(r, c).toLowerCase();
+                    if (text.includes('name:')) {
+                        const val = getVal(r, c + 2) || getVal(r, c + 1);
+                        if (val) charDetails.name = val;
+                    } else if (text.includes('class:')) {
+                        const val = getVal(r, c + 2) || getVal(r, c + 1);
+                        if (val) charDetails.class = val;
+                    } else if (text.includes('player:')) {
+                        const val = getVal(r, c + 2) || getVal(r, c + 1);
+                        if (val) charDetails.player = val;
+                    } else if (text.includes('current level:')) {
+                        const val = getVal(r, c + 2) || getVal(r, c + 1);
+                        if (val) charDetails.level = val;
+                    } else if (text.includes('adventures this level:')) {
+                        const val = getVal(r, c + 2) || getVal(r, c + 1);
+                        if (val) charDetails.adventures = val;
+                    }
+                }
+            }
+
+            // 4. Materials Inventory (Rows 1 to 19, Cols 1 to 9)
+            const materials = [];
+            for (let r = 1; r <= 19; r++) {
+                const affinity = getVal(r, 0);
+                for (let c = 1; c <= 9; c++) {
+                    const cellVal = getVal(r, c);
+                    const matType = headerCols[c];
+                    if (!cellVal || !matType) continue;
+
+                    // Match e.g. "1u", "2r", "1v", "1l"
+                    const matches = [...cellVal.matchAll(/(\d+)\s*([urvlURVL])/g)];
+                    for (const m of matches) {
+                        const qty = m[1];
+                        const key = m[2].toLowerCase();
+                        const rarityInfo = rarityMap[key] || { name: 'Unknown', class: '' };
+
+                        materials.push({
+                            quantity: qty,
+                            rarity: rarityInfo.name,
+                            rarityClass: rarityInfo.class,
+                            material: matType,
+                            affinity: affinity.toLowerCase() === 'normal' ? '' : affinity
+                        });
+                    }
+                }
+            }
+
+            // 5. Magic Items (Col 11) & Misc Items (Col 13)
+            const magicItems = [];
+            const miscItems = [];
+            for (let r = 1; r < rows.length; r++) {
+                const mVal = getVal(r, 11);
+                if (mVal && mVal.toLowerCase() !== 'magic items' && mVal.toLowerCase() !== 'none') {
+                    magicItems.push(mVal);
+                }
+
+                const miscVal = getVal(r, 13);
+                if (miscVal && miscVal.toLowerCase() !== 'misc.' && miscVal.toLowerCase() !== 'misc' && miscVal.toLowerCase() !== 'none') {
+                    miscItems.push(miscVal);
+                }
+            }
+
+            // Render all UI components
+            renderHero(charDetails);
+            renderReputations(reputations);
+            renderMaterials(materials);
+            renderItemsList('magic-items-list', magicItems, '✨', 'No magic items registered');
+            renderItemsList('misc-items-list', miscItems, '📌', 'No miscellaneous items registered');
+
+            document.getElementById('magic-count').textContent = `${magicItems.length} Item${magicItems.length === 1 ? '' : 's'}`;
+            document.getElementById('misc-count').textContent = `${miscItems.length} Item${miscItems.length === 1 ? '' : 's'}`;
+        }
+
+        function renderHero(details) {
+            document.getElementById('char-name').textContent = details.name;
+            document.getElementById('char-class').textContent = details.class;
+            document.getElementById('char-player').textContent = details.player;
+            document.getElementById('char-level').textContent = details.level;
+            document.getElementById('char-adventures').textContent = details.adventures;
+        }
+
+        function renderReputations(reps) {
+            const listEl = document.getElementById('reputation-list');
+            listEl.innerHTML = '';
+
+            let activeCount = 0;
+
+            reps.forEach(rep => {
+                const numericScore = parseFloat(rep.score) || 0;
+                const isPositive = numericScore > 0;
+                if (isPositive) activeCount++;
+
+                const item = document.createElement('div');
+                item.className = `reputation-item ${isPositive ? 'highlighted' : ''}`;
+
+                item.innerHTML = `
+                    <span class="faction-name">${rep.name}</span>
+                    <span class="reputation-value-badge ${isPositive ? 'rep-positive' : 'rep-neutral'}">
+                        ${isPositive ? '+' : ''}${rep.score}
+                    </span>
+                `;
+                listEl.appendChild(item);
+            });
+
+            document.getElementById('rep-active-count').textContent = `${activeCount} Positive`;
+        }
+
+        function renderMaterials(materials) {
+            const gridEl = document.getElementById('materials-grid');
+            gridEl.innerHTML = '';
+
+            document.getElementById('mat-count').textContent = `${materials.length} Material${materials.length === 1 ? '' : 's'}`;
+
+            if (materials.length === 0) {
+                gridEl.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">No harvested materials in inventory</div>`;
+                return;
+            }
+
+            materials.forEach(mat => {
+                const card = document.createElement('div');
+                card.className = `material-card ${mat.rarityClass}`;
+
+                const fullName = mat.affinity ? `${mat.affinity} ${mat.material}` : mat.material;
+
+                card.innerHTML = `
+                    <div class="mat-info">
+                        <span class="mat-name">${fullName}</span>
+                        <span class="mat-affinity">${mat.rarity}${mat.affinity ? ` &bull; ${mat.affinity}` : ''}</span>
+                    </div>
+                    <span class="mat-qty-badge">&times;${mat.quantity}</span>
+                `;
+                gridEl.appendChild(card);
+            });
+        }
+
+        function renderItemsList(elementId, items, icon, emptyText) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+
+            if (items.length === 0) {
+                container.innerHTML = `<div class="empty-state">${emptyText}</div>`;
+                return;
+            }
+
+            items.forEach(itemText => {
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                row.innerHTML = `<i>${icon}</i> <span>${itemText}</span>`;
+                container.appendChild(row);
+            });
+        }
+
+        // Start App
+        init();
+    </script>
+</body>
+</html>
