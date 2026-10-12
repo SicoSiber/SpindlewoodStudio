@@ -18,9 +18,8 @@
                 </div>
             </div>
             <div class="header-actions">
-                </button>
                 <a href="https://docs.google.com/spreadsheets/d/1f0XrgZxrFFFCIl2s8ZVTMASMDLpILMUgSwQ_2B4zRzQ/edit?gid=0#gid=0" target="_blank" rel="noopener" class="btn-secondary" title="Open Google Sheet in new tab">
-                    <span></span> Google Sheet
+                    <span>📊</span> Google Sheet
                 </a>
             </div>
         </div>
@@ -217,14 +216,25 @@
             });
         }
 
-        function setupEventListeners() {
-            document.getElementById('character-select').addEventListener('change', (e) => {
-                selectCharacter(e.target.value);
-            });
+        const setElemText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
 
-            document.getElementById('btn-refresh').addEventListener('click', () => {
-                loadCharacter(currentCharacter);
-            });
+        function setupEventListeners() {
+            const selectEl = document.getElementById('character-select');
+            if (selectEl) {
+                selectEl.addEventListener('change', (e) => {
+                    selectCharacter(e.target.value);
+                });
+            }
+
+            const refreshBtn = document.getElementById('btn-refresh');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', () => {
+                    loadCharacter(currentCharacter);
+                });
+            }
 
             window.addEventListener('hashchange', () => {
                 const hash = decodeURIComponent(window.location.hash.replace('#', '')).trim();
@@ -236,7 +246,8 @@
 
         function selectCharacter(name, updateHash = true) {
             currentCharacter = name;
-            document.getElementById('character-select').value = name;
+            const selectEl = document.getElementById('character-select');
+            if (selectEl) selectEl.value = name;
             
             // Update active pill state
             document.querySelectorAll('.pill-btn').forEach(btn => {
@@ -251,14 +262,16 @@
         }
 
         function showLoading(show) {
-            document.getElementById('loading-overlay').style.display = show ? 'block' : 'none';
-            document.getElementById('character-content').style.opacity = show ? '0.3' : '1';
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.style.display = show ? 'block' : 'none';
+            const content = document.getElementById('character-content');
+            if (content) content.style.opacity = show ? '0.3' : '1';
         }
 
         // Fetch character data directly from Google Visualization API with JSONP (no CORS restriction)
         function loadCharacter(sheetName) {
             showLoading(true);
-            document.getElementById('sync-text').textContent = 'Syncing...';
+            setElemText('sync-text', 'Syncing...');
 
             if (jsonpScriptElement) {
                 jsonpScriptElement.remove();
@@ -269,14 +282,14 @@
                 showLoading(false);
                 parseAndRenderData(jsonData);
                 const now = new Date();
-                document.getElementById('sync-text').textContent = `Live (${now.toLocaleTimeString()})`;
+                setElemText('sync-text', `Live (${now.toLocaleTimeString()})`);
             };
 
             const script = document.createElement('script');
             script.src = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?headers=0&sheet=${encodeURIComponent(sheetName)}&tqx=responseHandler:${callbackName}&_=${Date.now()}`;
             script.onerror = () => {
                 showLoading(false);
-                document.getElementById('sync-text').textContent = 'Sync error';
+                setElemText('sync-text', 'Sync error');
                 alert(`Could not load data for "${sheetName}". Please check if the sheet name exists.`);
             };
 
@@ -401,21 +414,21 @@
             renderItemsList('magic-items-list', magicItems, '✨', 'No magic items registered');
             renderItemsList('misc-items-list', miscItems, '📌', 'No miscellaneous items registered');
 
-            document.getElementById('magic-count').textContent = `${magicItems.length} Item${magicItems.length === 1 ? '' : 's'}`;
-            document.getElementById('misc-count').textContent = `${miscItems.length} Item${miscItems.length === 1 ? '' : 's'}`;
+            setElemText('magic-count', `${magicItems.length} Item${magicItems.length === 1 ? '' : 's'}`);
+            setElemText('misc-count', `${miscItems.length} Item${miscItems.length === 1 ? '' : 's'}`);
         }
 
         function renderHero(details) {
-            document.getElementById('char-name').textContent = details.name;
-            document.getElementById('char-class').textContent = details.class;
-            document.getElementById('char-player').textContent = details.player;
-            document.getElementById('char-level').textContent = details.level;
-            document.getElementById('char-adventures').textContent = details.adventures;
+            setElemText('char-name', details.name);
+            setElemText('char-class', details.class);
+            setElemText('char-player', details.player);
+            setElemText('char-level', details.level);
+            setElemText('char-adventures', details.adventures);
         }
 
         function renderReputations(reps) {
             const listEl = document.getElementById('reputation-list');
-            listEl.innerHTML = '';
+            if (listEl) listEl.innerHTML = '';
 
             let activeCount = 0;
 
@@ -424,29 +437,31 @@
                 const isPositive = numericScore > 0;
                 if (isPositive) activeCount++;
 
-                const item = document.createElement('div');
-                item.className = `reputation-item ${isPositive ? 'highlighted' : ''}`;
+                if (listEl) {
+                    const item = document.createElement('div');
+                    item.className = `reputation-item ${isPositive ? 'highlighted' : ''}`;
 
-                item.innerHTML = `
-                    <span class="faction-name">${rep.name}</span>
-                    <span class="reputation-value-badge ${isPositive ? 'rep-positive' : 'rep-neutral'}">
-                        ${isPositive ? '+' : ''}${rep.score}
-                    </span>
-                `;
-                listEl.appendChild(item);
+                    item.innerHTML = `
+                        <span class="faction-name">${rep.name}</span>
+                        <span class="reputation-value-badge ${isPositive ? 'rep-positive' : 'rep-neutral'}">
+                            ${isPositive ? '+' : ''}${rep.score}
+                        </span>
+                    `;
+                    listEl.appendChild(item);
+                }
             });
 
-            document.getElementById('rep-active-count').textContent = `${activeCount} Positive`;
+            setElemText('rep-active-count', `${activeCount} Positive`);
         }
 
         function renderMaterials(materials) {
             const gridEl = document.getElementById('materials-grid');
-            gridEl.innerHTML = '';
+            if (gridEl) gridEl.innerHTML = '';
 
-            document.getElementById('mat-count').textContent = `${materials.length} Material${materials.length === 1 ? '' : 's'}`;
+            setElemText('mat-count', `${materials.length} Material${materials.length === 1 ? '' : 's'}`);
 
             if (materials.length === 0) {
-                gridEl.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">No harvested materials in inventory</div>`;
+                if (gridEl) gridEl.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">No harvested materials in inventory</div>`;
                 return;
             }
 
