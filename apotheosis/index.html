@@ -19,7 +19,7 @@
             </div>
             <div class="header-actions">
                 <a href="https://docs.google.com/spreadsheets/d/1f0XrgZxrFFFCIl2s8ZVTMASMDLpILMUgSwQ_2B4zRzQ/edit?gid=0#gid=0" target="_blank" rel="noopener" class="btn-secondary" title="Open Google Sheet in new tab">
-                    <span>📊</span> Google Sheet
+                    Google Sheet
                 </a>
             </div>
         </div>
@@ -411,8 +411,8 @@
             renderHero(charDetails);
             renderReputations(reputations);
             renderMaterials(materials);
-            renderItemsList('magic-items-list', magicItems, '✨', 'No magic items registered');
-            renderItemsList('misc-items-list', miscItems, '📌', 'No miscellaneous items registered');
+            renderItemsList('magic-items-list', magicItems, 'No magic items registered');
+            renderItemsList('misc-items-list', miscItems, 'No miscellaneous items registered');
 
             setElemText('magic-count', `${magicItems.length} Item${magicItems.length === 1 ? '' : 's'}`);
             setElemText('misc-count', `${miscItems.length} Item${miscItems.length === 1 ? '' : 's'}`);
@@ -482,7 +482,7 @@
             });
         }
 
-        function renderItemsList(elementId, items, icon, emptyText) {
+        function renderItemsList(elementId, items, emptyText) {
             const container = document.getElementById(elementId);
             container.innerHTML = '';
 
@@ -494,7 +494,7 @@
             items.forEach(itemText => {
                 const row = document.createElement('div');
                 row.className = 'item-row';
-                row.innerHTML = `<i>${icon}</i> <span>${itemText}</span>`;
+                row.innerHTML = `<span>${itemText}</span>`;
                 container.appendChild(row);
             });
         }
